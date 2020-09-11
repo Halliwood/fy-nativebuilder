@@ -128,7 +128,7 @@ export class Builder {
             
             // 覆盖gradle脚本，增加签名信息、扩大jvm内存
             let appGradleContent = fs.readFileSync(path.join(__dirname, 'assets/build.gradle'), 'utf-8');
-            for(let rkey in cfgJson.replacement) {
+            for(let rkey in cfgJson) {
                 appGradleContent = appGradleContent.replace('{' + rkey + '}', cfgJson.replacement[rkey]);
             }
             let appGradlePath = path.join(androidProjPath, 'app/build.gradle');

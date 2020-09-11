@@ -121,7 +121,7 @@ var Builder = /** @class */ (function () {
             manifestContent = manifestContent.replace(/(?<=versionName=")\S+(?=")/, newVerName);
             // 覆盖gradle脚本，增加签名信息、扩大jvm内存
             var appGradleContent = fs.readFileSync(path.join(__dirname, 'assets/build.gradle'), 'utf-8');
-            for (var rkey in cfgJson.replacement) {
+            for (var rkey in cfgJson) {
                 appGradleContent = appGradleContent.replace('{' + rkey + '}', cfgJson.replacement[rkey]);
             }
             var appGradlePath = path.join(androidProjPath, 'app/build.gradle');
