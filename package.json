@@ -1,6 +1,6 @@
 {
   "name": "fy-nativebuilder",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "laya native builder for fygame.",
   "main": "bin/index.js",
   "scripts": {
