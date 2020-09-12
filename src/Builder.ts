@@ -8,7 +8,7 @@ import * as tkit from './tkit/Tkit';
 
 export class Builder {
     start(options: CmdOptions) {
-        let [projName, pf] = options.platform.split(':');
+        let [projName, pf, publishMode] = options.platform.split(':');
 
         // 先读取默认环境配置
         let envCfg = fs.readJSONSync(path.join(__dirname, 'assets/localEnv.json'), {encoding: 'utf-8'}) as LocalEnv;
@@ -62,16 +62,17 @@ export class Builder {
 
         // 拷贝dcc资源到增量包
         const StartLineNum = 3;
-        let resCfgRoot = path.join(envCfg.h5BuildConfigRoot, projName, pf, 'publish');
+        let resCfgRootParent = path.join(envCfg.h5BuildConfigRoot, projName, pf);
+        let resCfgRoot = path.join(resCfgRootParent, publishMode);
         let savedFiletablePath = path.join(resCfgRoot, 'filetable.txt');
-        if(fs.existsSync(resCfgRoot)) {
+        if(fs.existsSync(resCfgRootParent)) {
             tkit.svn.revert(resCfgRoot);
             tkit.svn.update(resCfgRoot);
         } else {
             fs.mkdirpSync(resCfgRoot);
             fs.writeFileSync(savedFiletablePath, '', 'utf-8');
-            tkit.svn.add(resCfgRoot);
-            tkit.svn.commit(resCfgRoot, 'init commit by Builder');
+            tkit.svn.add(resCfgRootParent);
+            tkit.svn.commit(resCfgRootParent, 'init commit by Builder');
         }
 
         // 先读取上次的dcc资源列表
@@ -82,6 +83,10 @@ export class Builder {
                 let saveFilePair = savedFiletableLines[i].split(/\s+/);
                 savedFileMap[saveFilePair[0]] = saveFilePair[1];
             }
+        } else {
+            fs.writeFileSync(savedFiletablePath, '', 'utf-8');
+            tkit.svn.add(savedFiletablePath);
+            tkit.svn.commit(savedFiletablePath, 'init commit by Builder');
         }
 
         // 遍历dcc资源，将新资源拷贝到增量包

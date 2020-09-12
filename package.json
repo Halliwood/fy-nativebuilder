@@ -4,7 +4,7 @@
   "description": "laya native builder for fygame.",
   "main": "bin/index.js",
   "scripts": {
-    "test": "tsc & node bin/index.js -p G:/qhgame/trunk/project --platform qhgame:xiaoma --gameid 0 --buildApk",
+    "test": "tsc & node bin/index.js -p G:/qhgame/trunk/project --platform qhgame:xiaoma:localTest --gameid 0 --buildApk",
     "build": "tsc",
     "release": "npm version patch && npm publish"
   },

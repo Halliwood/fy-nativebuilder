@@ -30,7 +30,7 @@ var Builder = /** @class */ (function () {
     function Builder() {
     }
     Builder.prototype.start = function (options) {
-        var _a = options.platform.split(':'), projName = _a[0], pf = _a[1];
+        var _a = options.platform.split(':'), projName = _a[0], pf = _a[1], publishMode = _a[2];
         // 先读取默认环境配置
         var envCfg = fs.readJSONSync(path.join(__dirname, 'assets/localEnv.json'), { encoding: 'utf-8' });
         if (options.localEnv) {
@@ -74,17 +74,18 @@ var Builder = /** @class */ (function () {
         fs.emptyDirSync(builtInCacheRoot);
         // 拷贝dcc资源到增量包
         var StartLineNum = 3;
-        var resCfgRoot = path.join(envCfg.h5BuildConfigRoot, projName, pf, 'publish');
+        var resCfgRootParent = path.join(envCfg.h5BuildConfigRoot, projName, pf);
+        var resCfgRoot = path.join(resCfgRootParent, publishMode);
         var savedFiletablePath = path.join(resCfgRoot, 'filetable.txt');
-        if (fs.existsSync(resCfgRoot)) {
+        if (fs.existsSync(resCfgRootParent)) {
             tkit.svn.revert(resCfgRoot);
             tkit.svn.update(resCfgRoot);
         }
         else {
             fs.mkdirpSync(resCfgRoot);
             fs.writeFileSync(savedFiletablePath, '', 'utf-8');
-            tkit.svn.add(resCfgRoot);
-            tkit.svn.commit(resCfgRoot, 'init commit by Builder');
+            tkit.svn.add(resCfgRootParent);
+            tkit.svn.commit(resCfgRootParent, 'init commit by Builder');
         }
         // 先读取上次的dcc资源列表
         var savedFileMap = {};
@@ -94,6 +95,11 @@ var Builder = /** @class */ (function () {
                 var saveFilePair = savedFiletableLines[i].split(/\s+/);
                 savedFileMap[saveFilePair[0]] = saveFilePair[1];
             }
+        }
+        else {
+            fs.writeFileSync(savedFiletablePath, '', 'utf-8');
+            tkit.svn.add(savedFiletablePath);
+            tkit.svn.commit(savedFiletablePath, 'init commit by Builder');
         }
         // 遍历dcc资源，将新资源拷贝到增量包
         var filetablePath = path.join(dccCacheFilesRoot, 'filetable.txt');
