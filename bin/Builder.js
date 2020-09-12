@@ -58,101 +58,102 @@ var Builder = /** @class */ (function () {
         tkit.FillJsonValues(cfgJson, envCfg);
         console.log(cfgJson);
         // 先打layadcc
-        var dccOutPath = path.join(cfgJson.output_path, cfgJson.projName, 'dcc');
-        fs.ensureDirSync(dccOutPath);
-        fs.emptyDirSync(dccOutPath);
-        var dccCmd = 'layadcc ' + cfgJson.res_path + ' -cache -url ' + cfgJson.url + ' -cout ' + path.resolve(dccOutPath);
-        console.log('start layadcc: %s', dccCmd);
-        var startAt = _.now();
-        console.log(cp.execSync(dccCmd, { encoding: 'utf-8' }));
-        console.log('layadcc finished, %d s costed.', Math.floor(_.now() - startAt) / 1000);
-        var dccCachePath = path.join(dccOutPath, 'cache');
-        var dirChilds = fs.readdirSync(dccCachePath);
-        var dccCacheFilesRoot = path.join(dccCachePath, dirChilds[0]);
-        var builtInCacheRoot = path.join(cfgJson.output_path, cfgJson.projName, 'builtin');
-        fs.ensureDirSync(builtInCacheRoot);
-        fs.emptyDirSync(builtInCacheRoot);
-        // 拷贝dcc资源到增量包
-        var StartLineNum = 3;
-        var resCfgRootParent = path.join(envCfg.h5BuildConfigRoot, projName, pf);
-        var resCfgRoot = path.join(resCfgRootParent, publishMode);
-        var savedFiletablePath = path.join(resCfgRoot, 'filetable.txt');
-        if (fs.existsSync(resCfgRootParent)) {
-            tkit.svn.revert(resCfgRoot);
-            tkit.svn.update(resCfgRoot);
-        }
-        else {
-            fs.mkdirpSync(resCfgRoot);
-            fs.writeFileSync(savedFiletablePath, '', 'utf-8');
-            tkit.svn.add(resCfgRootParent);
-            tkit.svn.commit(resCfgRootParent, 'init commit by Builder');
-        }
-        // 先读取上次的dcc资源列表
-        var savedFileMap = {};
-        if (fs.existsSync(savedFiletablePath)) {
-            var savedFiletableLines = fs.readFileSync(savedFiletablePath, 'utf-8').split(/[\r\n]+/);
-            for (var i = StartLineNum, len = savedFiletableLines.length; i < len; i++) {
-                var saveFilePair = savedFiletableLines[i].split(/\s+/);
-                savedFileMap[saveFilePair[0]] = saveFilePair[1];
+        var builtInCacheRoot;
+        if (options.dcc) {
+            var dccOutPath = path.join(cfgJson.output_path, cfgJson.projName, 'dcc');
+            fs.ensureDirSync(dccOutPath);
+            fs.emptyDirSync(dccOutPath);
+            var dccCmd = 'layadcc ' + cfgJson.res_path + ' -cache -url ' + cfgJson.url + ' -cout ' + path.resolve(dccOutPath);
+            console.log('start layadcc: %s', dccCmd);
+            var startAt = _.now();
+            console.log(cp.execSync(dccCmd, { encoding: 'utf-8' }));
+            console.log('layadcc finished, %d s costed.', Math.floor(_.now() - startAt) / 1000);
+            var dccCacheFilesRoot = path.join(dccOutPath, 'cache', this.getCacheFolder(cfgJson.url));
+            builtInCacheRoot = path.join(cfgJson.output_path, cfgJson.projName, 'builtin');
+            fs.ensureDirSync(builtInCacheRoot);
+            fs.emptyDirSync(builtInCacheRoot);
+            // 拷贝dcc资源到增量包
+            var StartLineNum = 3;
+            var resCfgRootParent = path.join(envCfg.h5BuildConfigRoot, projName, pf);
+            var resCfgRoot = path.join(resCfgRootParent, publishMode);
+            var savedFiletablePath = path.join(resCfgRoot, 'filetable.txt');
+            if (fs.existsSync(resCfgRootParent)) {
+                tkit.svn.revert(resCfgRoot);
+                tkit.svn.update(resCfgRoot);
             }
-        }
-        else {
-            fs.writeFileSync(savedFiletablePath, '', 'utf-8');
-            tkit.svn.add(savedFiletablePath);
-            tkit.svn.commit(savedFiletablePath, 'init commit by Builder');
-        }
-        // 遍历dcc资源，将新资源拷贝到增量包
-        var filetablePath = path.join(dccCacheFilesRoot, 'filetable.txt');
-        var filetableLines = fs.readFileSync(filetablePath, 'utf-8').split(/[\r\n]+/);
-        for (var i = StartLineNum, len = filetableLines.length; i < len; i++) {
-            var cacheFileName = filetableLines[i].split(/\s+/)[0];
-            if (!savedFileMap[cacheFileName]) {
-                fs.copyFileSync(path.join(dccCacheFilesRoot, cacheFileName), path.join(patchPath, cacheFileName));
+            else {
+                fs.mkdirpSync(resCfgRoot);
+                fs.writeFileSync(savedFiletablePath, '', 'utf-8');
+                tkit.svn.add(resCfgRootParent);
+                tkit.svn.commit(resCfgRootParent, 'init commit by Builder');
             }
-        }
-        // 拷贝几个dcc文件到增量包
-        var staticFiles = ['allfiles.txt', 'assetsid.txt', 'filetable.bin', 'filetable.txt'];
-        for (var _i = 0, staticFiles_1 = staticFiles; _i < staticFiles_1.length; _i++) {
-            var filename = staticFiles_1[_i];
-            fs.copyFileSync(path.join(dccCacheFilesRoot, filename), path.join(patchPath, filename));
-        }
-        // 保存本次的filetable.txt，将在资源外发时上传svn
-        fs.copyFileSync(filetablePath, savedFiletablePath);
-        // 筛选需要打进包内的资源
-        if (cfgJson.builtin) {
-            var builtinPath = path.join(projectFilesRoot, cfgJson.builtin);
-            var builtinLines = fs.readFileSync(builtinPath, 'utf-8').split(/[\r\n]+/);
-            var builtinCnt = builtinLines.length;
-            if (builtinCnt > 0) {
-                var allfilesPath = path.join(dccCacheFilesRoot, 'allfiles.txt');
-                var allfilesLines = fs.readFileSync(allfilesPath, 'utf-8').split(/[\r\n]+/);
-                // builtin.txt按照文件顺序写的，也就是说和allfiles.txt顺序是一致的，动态调整循环匹配的起始行，比每次都从第一个进行匹配效率高
-                var startMatchIdx = 0;
-                // allfiles.txt前3行校验用
-                for (var i = 0, len = allfilesLines.length; i < len; i++) {
-                    var oneFile = allfilesLines[i];
-                    var needBuiltin = false;
-                    var s = startMatchIdx;
-                    for (var j = s; j < builtinCnt; j++) {
-                        if (oneFile.startsWith(builtinLines[j])) {
-                            needBuiltin = true;
-                            startMatchIdx = j;
-                            break;
-                        }
-                    }
-                    if (!needBuiltin) {
-                        for (var j = 0; j < s; j++) {
+            // 先读取上次的dcc资源列表
+            var savedFileMap = {};
+            if (fs.existsSync(savedFiletablePath)) {
+                var savedFiletableLines = fs.readFileSync(savedFiletablePath, 'utf-8').split(/[\r\n]+/);
+                for (var i = StartLineNum, len = savedFiletableLines.length; i < len; i++) {
+                    var saveFilePair = savedFiletableLines[i].split(/\s+/);
+                    savedFileMap[saveFilePair[0]] = saveFilePair[1];
+                }
+            }
+            else {
+                fs.writeFileSync(savedFiletablePath, '', 'utf-8');
+                tkit.svn.add(savedFiletablePath);
+                tkit.svn.commit(savedFiletablePath, 'init commit by Builder');
+            }
+            // 遍历dcc资源，将新资源拷贝到增量包
+            var filetablePath = path.join(dccCacheFilesRoot, 'filetable.txt');
+            var filetableLines = fs.readFileSync(filetablePath, 'utf-8').split(/[\r\n]+/);
+            for (var i = StartLineNum, len = filetableLines.length; i < len; i++) {
+                var cacheFileName = filetableLines[i].split(/\s+/)[0];
+                if (!savedFileMap[cacheFileName]) {
+                    fs.copyFileSync(path.join(dccCacheFilesRoot, cacheFileName), path.join(patchPath, cacheFileName));
+                }
+            }
+            // 拷贝几个dcc文件到增量包
+            var staticFiles = ['allfiles.txt', 'assetsid.txt', 'filetable.bin', 'filetable.txt'];
+            for (var _i = 0, staticFiles_1 = staticFiles; _i < staticFiles_1.length; _i++) {
+                var filename = staticFiles_1[_i];
+                fs.copyFileSync(path.join(dccCacheFilesRoot, filename), path.join(patchPath, filename));
+            }
+            // 保存本次的filetable.txt，将在资源外发时上传svn
+            fs.copyFileSync(filetablePath, savedFiletablePath);
+            // 筛选需要打进包内的资源
+            if (cfgJson.builtin) {
+                var builtinPath = path.join(projectFilesRoot, cfgJson.builtin);
+                var builtinLines = fs.readFileSync(builtinPath, 'utf-8').split(/[\r\n]+/);
+                var builtinCnt = builtinLines.length;
+                if (builtinCnt > 0) {
+                    var allfilesPath = path.join(dccCacheFilesRoot, 'allfiles.txt');
+                    var allfilesLines = fs.readFileSync(allfilesPath, 'utf-8').split(/[\r\n]+/);
+                    // builtin.txt按照文件顺序写的，也就是说和allfiles.txt顺序是一致的，动态调整循环匹配的起始行，比每次都从第一个进行匹配效率高
+                    var startMatchIdx = 0;
+                    // allfiles.txt前3行校验用
+                    for (var i = 0, len = allfilesLines.length; i < len; i++) {
+                        var oneFile = allfilesLines[i];
+                        var needBuiltin = false;
+                        var s = startMatchIdx;
+                        for (var j = s; j < builtinCnt; j++) {
                             if (oneFile.startsWith(builtinLines[j])) {
                                 needBuiltin = true;
+                                startMatchIdx = j;
                                 break;
                             }
                         }
-                    }
-                    if (needBuiltin) {
-                        var cacheFileName = filetableLines[i + StartLineNum].split(/\s+/)[0];
-                        var cacheFilePath = path.join(dccCacheFilesRoot, cacheFileName);
-                        fs.copyFileSync(cacheFilePath, path.join(builtInCacheRoot, cacheFileName));
-                        fs.copyFileSync(cacheFilePath, path.join(patchPath, cacheFileName));
+                        if (!needBuiltin) {
+                            for (var j = 0; j < s; j++) {
+                                if (oneFile.startsWith(builtinLines[j])) {
+                                    needBuiltin = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (needBuiltin) {
+                            var cacheFileName = filetableLines[i + StartLineNum].split(/\s+/)[0];
+                            var cacheFilePath = path.join(dccCacheFilesRoot, cacheFileName);
+                            fs.copyFileSync(cacheFilePath, path.join(builtInCacheRoot, cacheFileName));
+                            fs.copyFileSync(cacheFilePath, path.join(patchPath, cacheFileName));
+                        }
                     }
                 }
             }
@@ -164,7 +165,7 @@ var Builder = /** @class */ (function () {
             // cmd = 'layanative createapp [-f res_path] [--path output_path] [-s sdk_path | -v version] [-p all|ios|android_eclipse|android_studio] [-t 0|1|2] [-u url] [-n project_name] [-a app_name] [--package_name package_name]'
             var nativeCmd = 'layanative createapp --path ' + cfgJson.output_path + ' -v ' + cfgJson.sdkver + ' -p ' + cfgJson.platform + ' -u ' + cfgJson.url + ' -n ' + cfgJson.projName + ' -a ' + cfgJson.appName + ' --package_name ' + cfgJson.package_name + ' -d ' + cfgJson.dememsionType;
             console.log('start create app: %s', nativeCmd);
-            startAt = _.now();
+            var startAt = _.now();
             console.log(cp.execSync(nativeCmd, { encoding: 'utf-8' }));
             console.log('createapp finished, %d s costed.', Math.floor((_.now() - startAt) / 1000));
             // 资源替换
@@ -201,8 +202,10 @@ var Builder = /** @class */ (function () {
             }
             var appGradlePath = path.join(androidProjPath, 'app/build.gradle');
             fs.writeFileSync(appGradlePath, appGradleContent, 'utf-8');
-            // 拷贝包内资源
-            fs.copySync(builtInCacheRoot, path.join(androidProjPath, 'app/src/main/assets/cache', dirChilds[0]));
+            if (options.dcc) {
+                // 拷贝包内资源
+                fs.copySync(builtInCacheRoot, path.join(androidProjPath, 'app/src/main/assets/cache', this.getCacheFolder(cfgJson.url)));
+            }
             // 拷贝local.properties、gradle.properties
             var coverFiles = ['local.properties', 'gradle.properties'];
             for (var _c = 0, coverFiles_1 = coverFiles; _c < coverFiles_1.length; _c++) {
@@ -227,6 +230,23 @@ var Builder = /** @class */ (function () {
             var targetApkPath = path.join(patchPath, 'apk', cfgJson.package_name + '.v' + newVerName + '.apk');
             this.copyFileEnsureExists(apkPath, targetApkPath);
         }
+    };
+    /**这段代码摘自layadcc源码 */
+    Builder.prototype.getCacheFolder = function (url) {
+        var cacheOut = url;
+        cacheOut = cacheOut.replace('http://', '');
+        var index = cacheOut.indexOf('?');
+        if (index > 0) {
+            cacheOut = cacheOut.substring(0, index);
+        }
+        index = cacheOut.lastIndexOf('/');
+        if (index > 0) {
+            cacheOut = cacheOut.substring(0, index);
+        }
+        cacheOut = cacheOut.replace(/:/g, '.');
+        cacheOut = cacheOut.replace(/\\/g, '_');
+        cacheOut = cacheOut.replace(/\//g, '_');
+        return cacheOut;
     };
     Builder.prototype.copyFileEnsureExists = function (src, dest) {
         if (!fs.existsSync(src)) {
