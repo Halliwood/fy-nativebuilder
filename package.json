@@ -2,10 +2,11 @@
   "name": "fy-nativebuilder",
   "version": "1.0.0",
   "description": "laya native builder for fygame.",
-  "main": "index.js",
+  "main": "bin/index.js",
   "scripts": {
     "test": "tsc & node bin/index.js -p G:/qhgame/trunk/project --platform qhgame:xiaoma --gameid 0 --buildApk",
-    "build": "tsc"
+    "build": "tsc", 
+    "release": "npm version patch && npm publish"
   },
   "repository": {
     "type": "git",
@@ -19,7 +20,8 @@
     "apk",
     "fygame"
   ],
-  "author": "teppei",
+  "author": "teppei", 
+  "bin": "bin/fy-nativebuilder", 
   "license": "MIT",
   "bugs": {
     "url": "https://github.com/Halliwood/fy-nativebuilder/issues"
