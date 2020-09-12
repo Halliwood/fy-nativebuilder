@@ -199,8 +199,11 @@ export class Builder {
             // 拷贝local.properties、gradle.properties
             let coverFiles = ['local.properties', 'gradle.properties'];
             for(let oneCoverFile of coverFiles) {
-                let localPropertiesPath = path.join(__dirname, 'assets', oneCoverFile);
-                fs.copySync(localPropertiesPath, path.join(androidProjPath, oneCoverFile));
+                let coverContent = fs.readFileSync(path.join(__dirname, 'assets', oneCoverFile), 'utf-8');
+                for(let rkey in cfgJson) {
+                    coverContent = coverContent.replace('{' + rkey + '}', cfgJson[rkey]);
+                }
+                fs.writeFileSync(path.join(androidProjPath, oneCoverFile), coverContent, 'utf-8');
             }
             
             // 打包

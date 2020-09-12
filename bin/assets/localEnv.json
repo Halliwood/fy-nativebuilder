@@ -1,5 +1,6 @@
 {
-    "keystoreRoot": "F:/GlobalScript/keystore/", 
+    "keystoreRoot": "F:/GlobalScript/keystore", 
     "gradleToolPath": "F:/GlobalScript/sdk/android/tools/gradle_tool_v3", 
-    "h5BuildConfigRoot": "F:/h5Build/configs/"
+    "h5BuildConfigRoot": "F:/h5Build/configs", 
+    "androidSdkDir": "D\\:\\\\android-sdk"
 }

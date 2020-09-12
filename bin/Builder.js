@@ -207,8 +207,11 @@ var Builder = /** @class */ (function () {
             var coverFiles = ['local.properties', 'gradle.properties'];
             for (var _c = 0, coverFiles_1 = coverFiles; _c < coverFiles_1.length; _c++) {
                 var oneCoverFile = coverFiles_1[_c];
-                var localPropertiesPath = path.join(__dirname, 'assets', oneCoverFile);
-                fs.copySync(localPropertiesPath, path.join(androidProjPath, oneCoverFile));
+                var coverContent = fs.readFileSync(path.join(__dirname, 'assets', oneCoverFile), 'utf-8');
+                for (var rkey in cfgJson) {
+                    coverContent = coverContent.replace('{' + rkey + '}', cfgJson[rkey]);
+                }
+                fs.writeFileSync(path.join(androidProjPath, oneCoverFile), coverContent, 'utf-8');
             }
             // 打包
             process.chdir(androidProjPath);
