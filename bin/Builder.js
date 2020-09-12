@@ -211,8 +211,8 @@ var Builder = /** @class */ (function () {
             for (var _c = 0, coverFiles_1 = coverFiles; _c < coverFiles_1.length; _c++) {
                 var oneCoverFile = coverFiles_1[_c];
                 var coverContent = fs.readFileSync(path.join(__dirname, 'assets', oneCoverFile), 'utf-8');
-                for (var rkey in cfgJson) {
-                    coverContent = coverContent.replace('{' + rkey + '}', cfgJson[rkey]);
+                for (var envkey in envCfg) {
+                    coverContent = coverContent.replace('{' + envkey + '}', envCfg[envkey]);
                 }
                 fs.writeFileSync(path.join(androidProjPath, oneCoverFile), coverContent, 'utf-8');
             }

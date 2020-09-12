@@ -204,8 +204,8 @@ export class Builder {
             let coverFiles = ['local.properties', 'gradle.properties'];
             for(let oneCoverFile of coverFiles) {
                 let coverContent = fs.readFileSync(path.join(__dirname, 'assets', oneCoverFile), 'utf-8');
-                for(let rkey in cfgJson) {
-                    coverContent = coverContent.replace('{' + rkey + '}', cfgJson[rkey]);
+                for(let envkey in envCfg) {
+                    coverContent = coverContent.replace('{' + envkey + '}', envCfg[envkey]);
                 }
                 fs.writeFileSync(path.join(androidProjPath, oneCoverFile), coverContent, 'utf-8');
             }
