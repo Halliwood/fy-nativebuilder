@@ -15,12 +15,12 @@ var getGameId = function (val) {
 };
 program
     .version(myPackage.version, "-v, --version")
-    .option("-p, --project <path>", "[MUST] Project root path. Directory.", getPath)
-    .option("--platform <string>", "[MUST] Platform name. String.")
-    .option("--gameid <number>", "[MUST] Game id.", getGameId)
+    .requiredOption("-p, --project <path>", "[MUST] Project root path. Directory.", getPath)
+    .requiredOption("--platform <string>", "[MUST] Platform name. String.")
+    .requiredOption("--gameid <number>", "[MUST] Game id.", getGameId)
     .option("--buildApk", "Build apk.")
     .option("--dcc", "Build dcc.")
-    .option("--localEnv", "Local environment setting file. String.", getPath)
+    .option("--localEnv <string>", "Local environment setting file. String.", getPath)
     .parse(process.argv);
 var options = program;
 if (!options.project) {
