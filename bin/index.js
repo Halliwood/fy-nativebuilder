@@ -10,28 +10,30 @@ var getPath = function (val) {
         return rst[2];
     return val;
 };
+var getGameId = function (val) {
+    return Number(val);
+};
 program
     .version(myPackage.version, "-v, --version")
     .option("-p, --project <path>", "[MUST] Project root path. Directory.", getPath)
     .option("--platform <string>", "[MUST] Platform name. String.")
-    .option("--gameid <number>", "[MUST] Game id.")
+    .option("--gameid <number>", "[MUST] Game id.", getGameId)
     .option("--buildApk", "Build apk.")
     .option("--dcc", "Build dcc.")
+    .option("--localEnv", "Local environment setting file. String.", getPath)
     .parse(process.argv);
-var projectPath = program.project;
-if (!projectPath) {
+var options = program;
+if (!options.project) {
     console.warn("The --project option is MUST.");
     program.help();
 }
-var platform = program.platform;
-if (!platform) {
+if (!options.platform) {
     console.warn("The --platform option is MUST.");
     program.help();
 }
-var gameid = Number(program.gameid);
-if (!lodash_1.isNumber(gameid)) {
+if (!lodash_1.isNumber(options.gameid)) {
     console.warn("The --gameid option is MUST.");
     program.help();
 }
 var builder = new Builder_1.Builder();
-builder.start(projectPath, platform, gameid, program.buildApk);
+builder.start(options);

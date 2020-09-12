@@ -20,11 +20,26 @@ export interface ProjectCfg {
         keystoreFile: string, 
         storePassword: string
     }
-    gradleTool: string, 
     builtin: string
 }
 
 export interface CfgDescriber {
     "global": ProjectCfg, 
     [gameid: string]: ProjectCfg
+}
+
+export interface LocalEnv {
+    keystoreRoot: string, 
+    gradleToolPath: string, 
+    h5BuildConfigRoot: string
+}
+
+export interface CmdOptions {
+    version?: string, 
+    project: string, 
+    platform: string, 
+	gameid: number, 
+	buildApk?: boolean, 
+	dcc?: boolean, 
+    localEnv?: string
 }

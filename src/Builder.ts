@@ -2,27 +2,43 @@ import cp = require('child_process');
 import { exit } from 'process';
 import fs = require('fs-extra');
 import path = require('path');
-import { CfgDescriber } from './Declares';
+import { CfgDescriber, CmdOptions, LocalEnv } from './Declares';
 import _ = require('lodash');
+import * as tkit from './tkit/Tkit';
 
 export class Builder {
-    start(projectPath: string, platform: string, gameid: number, buildApk: boolean) {
-        process.chdir(projectPath);
-        let projectFilesRoot = path.join(projectPath, 'build/projectfiles', platform);
+    start(options: CmdOptions) {
+        let [projName, pf] = options.platform.split(':');
+
+        // 先读取默认环境配置
+        let envCfg = fs.readJSONSync(path.join(__dirname, 'assets/localEnv.json'), {encoding: 'utf-8'}) as LocalEnv;
+        if(options.localEnv) {
+            // 再读取本地环境配置
+            let localEnv = fs.readJSONSync(options.localEnv, {encoding: 'utf-8'}) as LocalEnv;
+            envCfg = _.assign(envCfg, localEnv);
+        }
+
+        process.chdir(options.project);
+
+        let projectFilesRoot = path.join(options.project, 'build/projectfiles', pf);
+        // 清空patch文件夹
         let patchPath = path.join(projectFilesRoot, 'patch');
+        fs.ensureDirSync(patchPath);
+        fs.emptyDirSync(patchPath);
         
         let cfgPath = path.join(projectFilesRoot, 'common/cfg.json');
-        let cfgContent = fs.readFileSync(cfgPath, 'utf-8');
-        let cfgDscb = JSON.parse(cfgContent) as CfgDescriber;
-        let cfgJson = cfgDscb[gameid];        
+        let cfgDscb = fs.readJSONSync(cfgPath, {encoding: 'utf-8'}) as CfgDescriber;
+        let cfgJson = cfgDscb[options.gameid];        
         if(!cfgJson) {
-            console.error('no cfg found: %d', gameid);
+            console.error('no cfg found: %d', options.gameid);
         }
 
         // 读取全局配置
         let globalCfg = cfgDscb['global'];
         // 合并配置
         cfgJson = _.assign(globalCfg, cfgJson);
+        // 替换配置中的local变量
+        tkit.FillJsonValues(cfgJson, envCfg);
         console.log(cfgJson);
 
         // 先打layadcc
@@ -44,6 +60,47 @@ export class Builder {
         fs.ensureDirSync(builtInCacheRoot);
         fs.emptyDirSync(builtInCacheRoot);
 
+        // 拷贝dcc资源到增量包
+        const StartLineNum = 3;
+        let resCfgRoot = path.join(envCfg.h5BuildConfigRoot, projName, pf, 'publish');
+        let savedFiletablePath = path.join(resCfgRoot, 'filetable.txt');
+        if(fs.existsSync(resCfgRoot)) {
+            tkit.svn.revert(resCfgRoot);
+            tkit.svn.update(resCfgRoot);
+        } else {
+            fs.mkdirpSync(resCfgRoot);
+            fs.writeFileSync(savedFiletablePath, '', 'utf-8');
+            tkit.svn.add(resCfgRoot);
+            tkit.svn.commit(resCfgRoot, 'init commit by Builder');
+        }
+
+        // 先读取上次的dcc资源列表
+        let savedFileMap: {[filename: string]: string} = {};
+        if(fs.existsSync(savedFiletablePath)) {
+            let savedFiletableLines = fs.readFileSync(savedFiletablePath, 'utf-8').split(/[\r\n]+/);
+            for(let i = StartLineNum, len = savedFiletableLines.length; i < len; i++) {
+                let saveFilePair = savedFiletableLines[i].split(/\s+/);
+                savedFileMap[saveFilePair[0]] = saveFilePair[1];
+            }
+        }
+
+        // 遍历dcc资源，将新资源拷贝到增量包
+        let filetablePath = path.join(dccCacheFilesRoot, 'filetable.txt');
+        let filetableLines = fs.readFileSync(filetablePath, 'utf-8').split(/[\r\n]+/);
+        for(let i = StartLineNum, len = filetableLines.length; i < len; i++) {
+            let cacheFileName = filetableLines[i].split(/\s+/)[0];
+            if(!savedFileMap[cacheFileName]) {
+                fs.copyFileSync(path.join(dccCacheFilesRoot, cacheFileName), path.join(patchPath, cacheFileName));
+            }
+        }
+        // 拷贝几个dcc文件到增量包
+        let staticFiles = ['allfiles.txt', 'assetsid.txt', 'filetable.bin', 'filetable.txt'];
+        for(let filename of staticFiles) {
+            fs.copyFileSync(path.join(dccCacheFilesRoot, filename), path.join(patchPath, filename));
+        }
+        // 保存本次的filetable.txt，将在资源外发时上传svn
+        fs.copyFileSync(filetablePath, savedFiletablePath);
+
         // 筛选需要打进包内的资源
         if(cfgJson.builtin) {
             let builtinPath = path.join(projectFilesRoot, cfgJson.builtin);
@@ -51,15 +108,12 @@ export class Builder {
             let builtinCnt = builtinLines.length;
             if(builtinCnt > 0) {
                 let allfilesPath = path.join(dccCacheFilesRoot, 'allfiles.txt');
-                let allfilesLines = fs.readFileSync(allfilesPath, 'utf-8').split(/[\r\n]+/);
-                let filetablePath = path.join(dccCacheFilesRoot, 'filetable.txt');
-                let filetableLines = fs.readFileSync(filetablePath, 'utf-8').split(/[\r\n]+/);
+                let allfilesLines = fs.readFileSync(allfilesPath, 'utf-8').split(/[\r\n]+/);                
     
-                const StartLineNum = 3;
                 // builtin.txt按照文件顺序写的，也就是说和allfiles.txt顺序是一致的，动态调整循环匹配的起始行，比每次都从第一个进行匹配效率高
                 let startMatchIdx = 0;
                 // allfiles.txt前3行校验用
-                for(let i = StartLineNum, len = allfilesLines.length; i < len; i++) {
+                for(let i = 0, len = allfilesLines.length; i < len; i++) {
                     let oneFile = allfilesLines[i];
                     let needBuiltin = false;
                     let s = startMatchIdx;
@@ -89,7 +143,7 @@ export class Builder {
         }
         
         // 输出android工程
-        if(buildApk) {
+        if(options.buildApk) {
             let androidProjPath = path.join(cfgJson.output_path, cfgJson.projName, cfgJson.platform);
             fs.removeSync(androidProjPath);
             // cmd = 'layanative createapp [-f res_path] [--path output_path] [-s sdk_path | -v version] [-p all|ios|android_eclipse|android_studio] [-t 0|1|2] [-u url] [-n project_name] [-a app_name] [--package_name package_name]'
@@ -100,7 +154,7 @@ export class Builder {
             console.log('createapp finished, %d s costed.', Math.floor((_.now() - startAt) / 1000));
             
             // 资源替换
-            let projectReplaces = ['default', gameid + ''];
+            let projectReplaces = ['default', options.gameid + ''];
             for(let oneReplace of projectReplaces) {
                 let projectReplaceRoot = path.join(projectFilesRoot, 'android_studio', oneReplace);
                 if(fs.existsSync(projectReplaceRoot)) {
@@ -129,7 +183,7 @@ export class Builder {
             // 覆盖gradle脚本，增加签名信息、扩大jvm内存
             let appGradleContent = fs.readFileSync(path.join(__dirname, 'assets/build.gradle'), 'utf-8');
             for(let rkey in cfgJson) {
-                appGradleContent = appGradleContent.replace('{' + rkey + '}', cfgJson.replacement[rkey]);
+                appGradleContent = appGradleContent.replace('{' + rkey + '}', cfgJson[rkey]);
             }
             let appGradlePath = path.join(androidProjPath, 'app/build.gradle');
             fs.writeFileSync(appGradlePath, appGradleContent, 'utf-8');
@@ -148,13 +202,13 @@ export class Builder {
             process.chdir(androidProjPath);
 
             console.log('now we are %s', process.cwd());
-            let gradleCmd = cfgJson.gradleTool + '/gradlew assembleRelease';
+            let gradleCmd = path.join(envCfg.gradleToolPath, 'gradlew') + ' assembleRelease';
             console.log('start gradle: %s', gradleCmd);
             startAt = _.now();
             console.log(cp.execSync(gradleCmd, {encoding: 'utf-8'}));
             console.log('assemble finished, %d s costed.', Math.floor((_.now() - startAt) / 1000));
             
-            process.chdir(projectPath);
+            process.chdir(options.project);
             // 拷贝apk到增量包
             let apkPath = path.join(androidProjPath, 'app/build/outputs/apk/release/app-release.apk');
             let targetApkPath = path.join(patchPath, 'apk', cfgJson.package_name + '.v' + newVerName + '.apk');
